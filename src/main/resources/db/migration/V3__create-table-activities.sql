@@ -1,0 +1,13 @@
+ CREATE TABLE activities (
+     id UUID DEFAULT RANDOM_UUID() PRIMARY KEY,
+     trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+
+
+     title VARCHAR(255) NOT NULL,
+     occurs_at TIMESTAMP NOT NULL,
+
+
+
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ );
