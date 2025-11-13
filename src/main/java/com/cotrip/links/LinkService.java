@@ -16,14 +16,12 @@ public class LinkService {
   @Autowired
   private LinkRepository repository;
 
-  public LinkResponse registerLink(LinkRequestPayload payload, TripModel trip) {
     LinkModel newLink = new LinkModel(payload.title(), payload.url(), trip);
 
     this
       .repository
       .save(newLink);
 
-    return new LinkResponse(newLink.getId());
   }
 
   public List<LinkData> getAllLinkForTrip(UUID trip_id) {

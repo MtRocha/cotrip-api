@@ -42,9 +42,6 @@ public class TripController {
   private TripRepository repository;
 
 
-
-
-  @PostMapping
   public ResponseEntity<TripCreateResponse> createTrip(@RequestBody TripRequestPayload payload) {
     TripModel newTripModel = new TripModel(payload);
 
@@ -176,7 +173,6 @@ public class TripController {
 
     TripModel rawTripModel = trip.get();
 
-    LinkResponse linkResponse = this.linkService.registerLink(payload, rawTripModel);
 
     return ResponseEntity.ok().build();
   }
