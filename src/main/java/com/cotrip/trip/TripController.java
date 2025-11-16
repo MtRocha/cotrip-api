@@ -12,6 +12,7 @@ import com.cotrip.participant.DTO.ParticipantCreatedResponse;
 import com.cotrip.participant.DTO.ParticipantData;
 import com.cotrip.participant.DTO.ParticipantRequestPayload;
 import com.cotrip.trip.DTO.TripCreateResponse;
+import com.cotrip.trip.DTO.TripGetDTO;
 import com.cotrip.trip.DTO.TripRequestPayload;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -39,25 +40,23 @@ public class TripController {
   private LinkService linkService;
 
   @Autowired
-  private TripRepository repository;
+  private TripService tripService;
 
 
   public ResponseEntity<TripCreateResponse> createTrip(@RequestBody TripRequestPayload payload) {
-    TripModel newTripModel = new TripModel(payload);
 
-    this.repository.save(newTripModel);
-
-    this.participantService.registerParticipantsToEvent(payload.emails_to_invite(), newTripModel);
+    var newTripModel = tripService.CreateTrip(payload);
 
     return ResponseEntity.ok(
-      new TripCreateResponse(newTripModel.getId())
+      new TripCreateResponse(newTripModel.id())
     );
 
   }
 
   @GetMapping
-  public ResponseEntity<List<TripModel>> getAllTrips() {
-    List<TripModel> trips = this.repository.findAll();
+  public ResponseEntity<List<TripGetDTO>> getAllTrips() {
+
+    var trips = tripService.getTrips();
 
     if (trips.isEmpty()) {
       return ResponseEntity.<List<TripModel>>noContent().build();
@@ -67,66 +66,44 @@ public class TripController {
   }
 
   @GetMapping("/{tripId}")
-  public ResponseEntity<TripModel> getTripDetails(@PathVariable UUID tripId) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+  public ResponseEntity<TripGetDTO> getTripDetails(@PathVariable UUID tripId) {
 
+    var trip = tripService.getTripById(tripId);
 
     return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
   };
 
   @PutMapping("/{tripId}")
-  public ResponseEntity<TripModel> updateTripDetails(@PathVariable UUID tripId, @RequestBody TripRequestPayload payload) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+  public ResponseEntity<TripGetDTO> updateTripDetails(@PathVariable UUID tripId, @RequestBody TripRequestPayload payload) {
 
-    if(trip.isEmpty()) {
-      return ResponseEntity.notFound().build();
-    }
+      var trip = tripService.UpdateTrip(tripId, payload);
 
-    TripModel rawTripModel = trip.get();
-    rawTripModel.setDestination(payload.destination());
-    rawTripModel.setStartAt(LocalDateTime.parse(payload.start_at(), DateTimeFormatter.ISO_DATE_TIME));
-    rawTripModel.setEndAt(LocalDateTime.parse(payload.end_at(), DateTimeFormatter.ISO_DATE_TIME));
-    this.repository.save(rawTripModel);
+      return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
 
-
-    return ResponseEntity.ok(rawTripModel);
   };
 
-
-
   @GetMapping("/{tripId}/confirm")
-  public ResponseEntity<TripModel> confirmTrip(@PathVariable UUID tripId) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+  public ResponseEntity<TripGetDTO> confirmTrip(@PathVariable UUID tripId) {
 
-    if(trip.isEmpty()) {
-      return ResponseEntity.notFound().build();
-    }
+      var trip = tripService.ConfirmTrip(tripId);
 
-    TripModel rawTripModel = trip.get();
-    rawTripModel.setIsConfirmed(true);
-    this.repository.save(rawTripModel);
+      this.participantService.triggerConfirmationEmailToParticipants(tripId);
 
-    this.participantService.triggerConfirmationEmailToParticipants(tripId);
-
-
-
-    return ResponseEntity.ok(rawTripModel);
+      return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
 
   };
 
   @PostMapping("/{tripId}/new-invite")
   public ResponseEntity<String> inviteNewParticipants(@PathVariable UUID tripId, @RequestBody ParticipantRequestPayload payload) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+    Optional<TripGetDTO> trip = tripService.getTripById(tripId);
 
     if(trip.isEmpty()) {
       return ResponseEntity.notFound().build();
     }
 
-    TripModel rawTripModel = trip.get();
+    ParticipantCreatedResponse participantResponse = this.participantService.registerParticipantToEvent(payload.email(), trip.get().id());
 
-    ParticipantCreatedResponse participantResponse = this.participantService.registerParticipantToEvent(payload.email(), rawTripModel);
-
-    if(rawTripModel.getIsConfirmed()) this.participantService.triggerConfirmationEmailToParticipant(payload.email());
+    if(trip.get().isConfirmed()) this.participantService.triggerConfirmationEmailToParticipant(payload.email());
 
 
     return ResponseEntity.ok().build();
@@ -139,19 +116,14 @@ public class TripController {
     return ResponseEntity.ok(res);
   }
 
-
-
   @PostMapping("/{tripId}/new-activity")
   public ResponseEntity<String> createNewActivity(@PathVariable UUID tripId, @RequestBody ActivityRequestPayload payload) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+      Optional<TripGetDTO> trip = tripService.getTripById(tripId);
 
-    if(trip.isEmpty()) {
-      return ResponseEntity.notFound().build();
-    }
-
-    TripModel rawTripModel = trip.get();
-
-    ActivityResponse activityResponse = this.activitiesService.registerActivity(payload, rawTripModel);
+      if(trip.isEmpty()) {
+          return ResponseEntity.notFound().build();
+      }
+    ActivityResponse activityResponse = this.activitiesService.registerActivity(payload, trip.get().id());
 
     return ResponseEntity.ok().build();
   };
@@ -165,15 +137,14 @@ public class TripController {
 
   @PostMapping("/{tripId}/new-link")
   public ResponseEntity<String> createNewLink(@PathVariable UUID tripId, @RequestBody LinkRequestPayload payload) {
-    Optional<TripModel> trip = this.repository.findById(tripId);
+      Optional<TripGetDTO> trip = tripService.getTripById(tripId);
 
-    if(trip.isEmpty()) {
-      return ResponseEntity.notFound().build();
-    }
+      if(trip.isEmpty()) {
+          return ResponseEntity.notFound().build();
+      }
 
-    TripModel rawTripModel = trip.get();
 
-    this.linkService.createLink(payload, rawTripModel);
+    this.linkService.createLink(payload, trip.get().id());
 
 
     return ResponseEntity.ok().build();
