@@ -173,6 +173,8 @@ public class TripController {
 
     TripModel rawTripModel = trip.get();
 
+    this.linkService.createLink(payload, rawTripModel);
+
 
     return ResponseEntity.ok().build();
   }
